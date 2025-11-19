@@ -1,0 +1,245 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#define MAX_NOME 100
+#define MAX_EMAIL 100
+#define CPF_SIZE 12  // 11 dígitos + '\0'
+
+typedef struct {
+    char nome[MAX_NOME];
+    char cpf[CPF_SIZE];
+    int idade;
+    char email[MAX_EMAIL];
+} Pessoa;
+
+const char *ARQUIVO = "pessoas.dat";
+
+// Função para verificar se CPF tem exatamente 11 dígitos numéricos
+int validarCPF(const char *cpf) {
+    if (strlen(cpf) != 11) return 0;
+    for (int i = 0; i < 11; i++) {
+        if (!isdigit(cpf[i])) return 0;
+    }
+    return 1;
+}
+
+// Função para verificar se CPF já existe no arquivo
+int cpfExiste(const char *cpf) {
+    FILE *file = fopen(ARQUIVO, "rb");
+    if (!file) return 0;
+    Pessoa p;
+    while (fread(&p, sizeof(Pessoa), 1, file)) {
+        if (strcmp(p.cpf, cpf) == 0) {
+            fclose(file);
+            return 1;
+        }
+    }
+    fclose(file);
+    return 0;
+}
+
+// Função para cadastrar nova pessoa
+void cadastrar() {
+    Pessoa p;
+    printf("Nome: ");
+    fgets(p.nome, MAX_NOME, stdin);
+    p.nome[strcspn(p.nome, "\n")] = 0;  // Remove newline
+
+    printf("CPF (11 dígitos): ");
+    fgets(p.cpf, CPF_SIZE, stdin);
+    p.cpf[strcspn(p.cpf, "\n")] = 0;
+
+    if (!validarCPF(p.cpf)) {
+        printf("CPF inválido! Deve ter exatamente 11 dígitos numéricos.\n");
+        return;
+    }
+    if (cpfExiste(p.cpf)) {
+        printf("CPF já cadastrado!\n");
+        return;
+    }
+
+    printf("Idade: ");
+    scanf("%d", &p.idade);
+    getchar();  // Consome newline
+    if (p.idade <= 0) {
+        printf("Idade inválida!\n");
+        return;
+    }
+
+    printf("E-mail: ");
+    fgets(p.email, MAX_EMAIL, stdin);
+    p.email[strcspn(p.email, "\n")] = 0;
+
+    FILE *file = fopen(ARQUIVO, "ab");
+    if (!file) {
+        printf("Erro ao abrir arquivo!\n");
+        return;
+    }
+    fwrite(&p, sizeof(Pessoa), 1, file);
+    fclose(file);
+    printf("Pessoa cadastrada com sucesso!\n");
+}
+
+// Função para listar todas as pessoas
+void listar() {
+    FILE *file = fopen(ARQUIVO, "rb");
+    if (!file) {
+        printf("Nenhuma pessoa cadastrada.\n");
+        return;
+    }
+    Pessoa p;
+    while (fread(&p, sizeof(Pessoa), 1, file)) {
+        printf("Nome: %s\nCPF: %s\nIdade: %d\nE-mail: %s\n\n", p.nome, p.cpf, p.idade, p.email);
+    }
+    fclose(file);
+}
+
+// Função para buscar pessoa por CPF
+void buscar() {
+    char cpf[CPF_SIZE];
+    printf("CPF para buscar: ");
+    fgets(cpf, CPF_SIZE, stdin);
+    cpf[strcspn(cpf, "\n")] = 0;
+
+    FILE *file = fopen(ARQUIVO, "rb");
+    if (!file) {
+        printf("Arquivo não encontrado.\n");
+        return;
+    }
+    Pessoa p;
+    int encontrado = 0;
+    while (fread(&p, sizeof(Pessoa), 1, file)) {
+        if (strcmp(p.cpf, cpf) == 0) {
+            printf("Nome: %s\nCPF: %s\nIdade: %d\nE-mail: %s\n", p.nome, p.cpf, p.idade, p.email);
+            encontrado = 1;
+            break;
+        }
+    }
+    if (!encontrado) printf("Pessoa não encontrada.\n");
+    fclose(file);
+}
+
+// Função para atualizar dados por CPF
+void atualizar() {
+    char cpf[CPF_SIZE];
+    printf("CPF para atualizar: ");
+    fgets(cpf, CPF_SIZE, stdin);
+    cpf[strcspn(cpf, "\n")] = 0;
+
+    FILE *file = fopen(ARQUIVO, "rb");
+    if (!file) {
+        printf("Arquivo não encontrado.\n");
+        return;
+    }
+
+    FILE *temp = fopen("temp.dat", "wb");
+    if (!temp) {
+        printf("Erro ao criar arquivo temporário.\n");
+        fclose(file);
+        return;
+    }
+
+    Pessoa p;
+    int encontrado = 0;
+    while (fread(&p, sizeof(Pessoa), 1, file)) {
+        if (strcmp(p.cpf, cpf) == 0) {
+            printf("Dados atuais:\nNome: %s\nIdade: %d\nE-mail: %s\n", p.nome, p.idade, p.email);
+            printf("Novo nome: ");
+            fgets(p.nome, MAX_NOME, stdin);
+            p.nome[strcspn(p.nome, "\n")] = 0;
+            printf("Nova idade: ");
+            scanf("%d", &p.idade);
+            getchar();
+            printf("Novo e-mail: ");
+            fgets(p.email, MAX_EMAIL, stdin);
+            p.email[strcspn(p.email, "\n")] = 0;
+            encontrado = 1;
+        }
+        fwrite(&p, sizeof(Pessoa), 1, temp);
+    }
+    fclose(file);
+    fclose(temp);
+
+    if (encontrado) {
+        remove(ARQUIVO);
+        rename("temp.dat", ARQUIVO);
+        printf("Pessoa atualizada com sucesso!\n");
+    } else {
+        remove("temp.dat");
+        printf("Pessoa não encontrada.\n");
+    }
+}
+
+// Função para remover pessoa por CPF
+void remover() {
+    char cpf[CPF_SIZE];
+    printf("CPF para remover: ");
+    fgets(cpf, CPF_SIZE, stdin);
+    cpf[strcspn(cpf, "\n")] = 0;
+
+    FILE *file = fopen(ARQUIVO, "rb");
+    if (!file) {
+        printf("Arquivo não encontrado.\n");
+        return;
+    }
+
+    FILE *temp = fopen("temp.dat", "wb");
+    if (!temp) {
+        printf("Erro ao criar arquivo temporário.\n");
+        fclose(file);
+        return;
+    }
+
+    Pessoa p;
+    int encontrado = 0;
+    while (fread(&p, sizeof(Pessoa), 1, file)) {
+        if (strcmp(p.cpf, cpf) != 0) {
+            fwrite(&p, sizeof(Pessoa), 1, temp);
+        } else {
+            encontrado = 1;
+        }
+    }
+    fclose(file);
+    fclose(temp);
+
+    if (encontrado) {
+        remove(ARQUIVO);
+        rename("temp.dat", ARQUIVO);
+        printf("Pessoa removida com sucesso!\n");
+    } else {
+        remove("temp.dat");
+        printf("Pessoa não encontrada.\n");
+    }
+}
+
+// Função principal com menu
+int main() {
+    int opcao;
+    do {
+        printf("\nMenu:\n");
+        printf("1. Cadastrar nova pessoa\n");
+        printf("2. Listar todas as pessoas\n");
+        printf("3. Buscar pessoa por CPF\n");
+        printf("4. Atualizar dados por CPF\n");
+        printf("5. Remover pessoa por CPF\n");
+        printf("6. Sair\n");
+        printf("Escolha uma opção: ");
+        scanf("%d", &opcao);
+        getchar();  // Consome newline
+
+        switch (opcao) {
+            case 1: cadastrar(); break;
+            case 2: listar(); break;
+            case 3: buscar(); break;
+            case 4: atualizar(); break;
+            case 5: remover(); break;
+            case 6: printf("Saindo...\n"); break;
+            default: printf("Opção inválida!\n");
+        }
+    } while (opcao != 6);
+
+    return 0;
+}
+
